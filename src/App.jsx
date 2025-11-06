@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, TrendingUp, DollarSign, Target, BookOpen, Trash2, AlertCircle, Download, LogOut, User } from 'lucide-react';
+import { PlusCircle, TrendingUp, DollarSign, Target, BookOpen, Trash2, AlertCircle, Download, LogOut } from 'lucide-react';
+
+// ========== CONFIGURAÇÃO DA API ==========
+const API_URL = 'https://daytrade-backend.skinalanches.com.br/'; // ⚠️ MUDE PARA SUA URL!
 
 export default function DayTradeMonitor() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -8,6 +11,7 @@ export default function DayTradeMonitor() {
   const [registerForm, setRegisterForm] = useState({ username: '', password: '', confirmPassword: '' });
   const [showRegister, setShowRegister] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [loading, setLoading] = useState(false);
   
   const [activeTab, setActiveTab] = useState('operacoes');
   const [operacoes, setOperacoes] = useState([]);
@@ -24,9 +28,6 @@ export default function DayTradeMonitor() {
     precoEntrada: '',
     precoSaida: '',
     stopLoss: '',
-    corretagem: '',
-    emolumentos: '',
-    taxaLiquidacao: '',
     observacoes: ''
   });
 
@@ -50,105 +51,187 @@ export default function DayTradeMonitor() {
     taxaLiquidacaoPadrao: '0.0275'
   });
 
-  // Verificar login ao carregar
+  // ========== VERIFICAR LOGIN AO CARREGAR ==========
   useEffect(() => {
-    const loggedUser = localStorage.getItem('daytrade_current_user');
-    if (loggedUser) {
-      setCurrentUser(loggedUser);
+    const userData = localStorage.getItem('current_user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      setCurrentUser(user);
       setIsLoggedIn(true);
-      loadUserData(loggedUser);
+      loadUserData(user.id);
     }
   }, []);
 
-  // Salvar dados do usuário
-  useEffect(() => {
-    if (currentUser && isLoggedIn) {
-      localStorage.setItem(`daytrade_${currentUser}_operacoes`, JSON.stringify(operacoes));
-    }
-  }, [operacoes, currentUser, isLoggedIn]);
+  // ========== CARREGAR DADOS DO USUÁRIO ==========
+  const loadUserData = async (userId) => {
+    try {
+      setLoading(true);
+      
+      const opsRes = await fetch(`${API_URL}/operacoes/${userId}`);
+      if (opsRes.ok) {
+        const opsData = await opsRes.json();
+        setOperacoes(opsData);
+      }
+      
+      const configRes = await fetch(`${API_URL}/configuracao/${userId}`);
+      if (configRes.ok) {
+        const configData = await configRes.json();
+        if (configData && Object.keys(configData).length > 0) {
+          setConfiguracaoRisco({
+            capitalTotal: configData.capital_total || '',
+            riscoPorOperacao: configData.risco_por_operacao || '2',
+            metaDiaria: configData.meta_diaria || '',
+            perdaMaximaDiaria: configData.perda_maxima_diaria || '',
+            corretgemPadrao: configData.corretagem_padrao || '10',
+            emolumentosPadrao: configData.emolumentos_padrao || '0.0325',
+            taxaLiquidacaoPadrao: configData.taxa_liquidacao_padrao || '0.0275'
+          });
+        }
+      }
 
-  useEffect(() => {
-    if (currentUser && isLoggedIn) {
-      localStorage.setItem(`daytrade_${currentUser}_diarios`, JSON.stringify(diarios));
+      const diariosRes = await fetch(`${API_URL}/diarios/${userId}`);
+      if (diariosRes.ok) {
+        const diariosData = await diariosRes.json();
+        setDiarios(diariosData);
+      }
+      
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [diarios, currentUser, isLoggedIn]);
+  };
 
+  // ========== SALVAR CONFIGURAÇÕES ==========
   useEffect(() => {
     if (currentUser && isLoggedIn) {
-      localStorage.setItem(`daytrade_${currentUser}_risco`, JSON.stringify(configuracaoRisco));
+      const timeoutId = setTimeout(async () => {
+        try {
+          await fetch(`${API_URL}/configuracao`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: currentUser.id,
+              capital_total: parseFloat(configuracaoRisco.capitalTotal) || null,
+              risco_por_operacao: parseFloat(configuracaoRisco.riscoPorOperacao) || 2,
+              meta_diaria: parseFloat(configuracaoRisco.metaDiaria) || null,
+              perda_maxima_diaria: parseFloat(configuracaoRisco.perdaMaximaDiaria) || null,
+              corretagem_padrao: parseFloat(configuracaoRisco.corretgemPadrao) || 10,
+              emolumentos_padrao: parseFloat(configuracaoRisco.emolumentosPadrao) || 0.0325,
+              taxa_liquidacao_padrao: parseFloat(configuracaoRisco.taxaLiquidacaoPadrao) || 0.0275
+            })
+          });
+        } catch (error) {
+          console.error('Erro ao salvar configuração:', error);
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [configuracaoRisco, currentUser, isLoggedIn]);
 
-  const loadUserData = (username) => {
-    const ops = localStorage.getItem(`daytrade_${username}_operacoes`);
-    const diar = localStorage.getItem(`daytrade_${username}_diarios`);
-    const risc = localStorage.getItem(`daytrade_${username}_risco`);
-    
-    if (ops) setOperacoes(JSON.parse(ops));
-    if (diar) setDiarios(JSON.parse(diar));
-    if (risc) setConfiguracaoRisco(JSON.parse(risc));
-  };
-
-  const handleLogin = () => {
+  // ========== LOGIN ==========
+  const handleLogin = async () => {
     setLoginError('');
+    setLoading(true);
     
     if (!loginForm.username || !loginForm.password) {
       setLoginError('Preencha todos os campos');
+      setLoading(false);
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem('daytrade_users') || '{}');
-    
-    if (users[loginForm.username] && users[loginForm.username] === loginForm.password) {
-      setCurrentUser(loginForm.username);
+    try {
+      const response = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: loginForm.username,
+          password: loginForm.password
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro no login');
+      }
+
+      const data = await response.json();
+      const user = data.user;
+      
+      setCurrentUser(user);
       setIsLoggedIn(true);
-      localStorage.setItem('daytrade_current_user', loginForm.username);
-      loadUserData(loginForm.username);
+      localStorage.setItem('current_user', JSON.stringify(user));
+      await loadUserData(user.id);
       setLoginForm({ username: '', password: '' });
-    } else {
-      setLoginError('Usuário ou senha incorretos');
+      
+    } catch (error) {
+      setLoginError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRegister = () => {
+  // ========== CADASTRO ==========
+  const handleRegister = async () => {
     setLoginError('');
+    setLoading(true);
     
     if (!registerForm.username || !registerForm.password || !registerForm.confirmPassword) {
       setLoginError('Preencha todos os campos');
+      setLoading(false);
       return;
     }
 
     if (registerForm.password !== registerForm.confirmPassword) {
       setLoginError('As senhas não coincidem');
+      setLoading(false);
       return;
     }
 
     if (registerForm.password.length < 4) {
       setLoginError('A senha deve ter no mínimo 4 caracteres');
+      setLoading(false);
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem('daytrade_users') || '{}');
-    
-    if (users[registerForm.username]) {
-      setLoginError('Usuário já existe');
-      return;
-    }
+    try {
+      const response = await fetch(`${API_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: registerForm.username,
+          password: registerForm.password
+        })
+      });
 
-    users[registerForm.username] = registerForm.password;
-    localStorage.setItem('daytrade_users', JSON.stringify(users));
-    
-    setCurrentUser(registerForm.username);
-    setIsLoggedIn(true);
-    localStorage.setItem('daytrade_current_user', registerForm.username);
-    setRegisterForm({ username: '', password: '', confirmPassword: '' });
-    setShowRegister(false);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro no cadastro');
+      }
+
+      const data = await response.json();
+      const user = data.user;
+      
+      setCurrentUser(user);
+      setIsLoggedIn(true);
+      localStorage.setItem('current_user', JSON.stringify(user));
+      await loadUserData(user.id);
+      setRegisterForm({ username: '', password: '', confirmPassword: '' });
+      setShowRegister(false);
+      
+    } catch (error) {
+      setLoginError(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ========== LOGOUT ==========
   const handleLogout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
-    localStorage.removeItem('daytrade_current_user');
+    localStorage.removeItem('current_user');
     setOperacoes([]);
     setDiarios([]);
     setConfiguracaoRisco({
@@ -162,6 +245,7 @@ export default function DayTradeMonitor() {
     });
   };
 
+  // ========== CÁLCULOS ==========
   const calcularOperacao = () => {
     const qtd = parseFloat(novaOperacao.quantidade) || 0;
     const entrada = parseFloat(novaOperacao.precoEntrada) || 0;
@@ -170,10 +254,10 @@ export default function DayTradeMonitor() {
     
     const resultadoBruto = (saida - entrada) * qtd * multiplicador;
     
-    const corretagem = parseFloat(novaOperacao.corretagem) || parseFloat(configuracaoRisco.corretgemPadrao) || 0;
+    const corretagem = parseFloat(configuracaoRisco.corretgemPadrao) || 0;
     const volumeTotal = (entrada * qtd) + (saida * qtd);
-    const emolumentos = volumeTotal * (parseFloat(novaOperacao.emolumentos || configuracaoRisco.emolumentosPadrao) / 100);
-    const taxaLiquidacao = volumeTotal * (parseFloat(novaOperacao.taxaLiquidacao || configuracaoRisco.taxaLiquidacaoPadrao) / 100);
+    const emolumentos = volumeTotal * (parseFloat(configuracaoRisco.emolumentosPadrao) / 100);
+    const taxaLiquidacao = volumeTotal * (parseFloat(configuracaoRisco.taxaLiquidacaoPadrao) / 100);
     
     const custoTotal = corretagem + emolumentos + taxaLiquidacao;
     const resultadoLiquido = resultadoBruto - custoTotal;
@@ -193,7 +277,8 @@ export default function DayTradeMonitor() {
     };
   };
 
-  const adicionarOperacao = () => {
+  // ========== ADICIONAR OPERAÇÃO ==========
+  const adicionarOperacao = async () => {
     if (!novaOperacao.data || !novaOperacao.ativo || !novaOperacao.quantidade || 
         !novaOperacao.precoEntrada || !novaOperacao.precoSaida) {
       return;
@@ -201,58 +286,122 @@ export default function DayTradeMonitor() {
     
     const calculos = calcularOperacao();
     
-    const operacao = {
-      id: Date.now(),
-      ...novaOperacao,
-      ...calculos
-    };
-    
-    setOperacoes([operacao, ...operacoes]);
-    setNovaOperacao({
-      data: '',
-      ativo: '',
-      tipo: 'compra',
-      quantidade: '',
-      precoEntrada: '',
-      precoSaida: '',
-      stopLoss: '',
-      corretagem: '',
-      emolumentos: '',
-      taxaLiquidacao: '',
-      observacoes: ''
-    });
+    try {
+      const response = await fetch(`${API_URL}/operacoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          data: novaOperacao.data,
+          ativo: novaOperacao.ativo,
+          tipo: novaOperacao.tipo,
+          quantidade: parseInt(novaOperacao.quantidade),
+          preco_entrada: parseFloat(novaOperacao.precoEntrada),
+          preco_saida: parseFloat(novaOperacao.precoSaida),
+          stop_loss: novaOperacao.stopLoss ? parseFloat(novaOperacao.stopLoss) : null,
+          resultado_bruto: parseFloat(calculos.resultadoBruto),
+          corretagem: parseFloat(calculos.corretagem),
+          emolumentos: parseFloat(calculos.emolumentos),
+          taxa_liquidacao: parseFloat(calculos.taxaLiquidacao),
+          custo_total: parseFloat(calculos.custoTotal),
+          imposto: parseFloat(calculos.imposto),
+          resultado_final: parseFloat(calculos.resultadoFinal),
+          observacoes: novaOperacao.observacoes || null
+        })
+      });
+
+      if (response.ok) {
+        await loadUserData(currentUser.id);
+        setNovaOperacao({
+          data: '',
+          ativo: '',
+          tipo: 'compra',
+          quantidade: '',
+          precoEntrada: '',
+          precoSaida: '',
+          stopLoss: '',
+          observacoes: ''
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar operação:', error);
+      alert('Erro ao adicionar operação');
+    }
   };
 
-  const adicionarDiario = () => {
+  // ========== DELETAR OPERAÇÃO ==========
+  const deletarOperacao = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/operacoes/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setOperacoes(operacoes.filter(op => op.id !== id));
+      }
+    } catch (error) {
+      console.error('Erro ao deletar operação:', error);
+      alert('Erro ao deletar operação');
+    }
+  };
+
+  // ========== ADICIONAR DIÁRIO ==========
+  const adicionarDiario = async () => {
     if (!novoDiario.data) {
       return;
     }
     
-    const diario = {
-      id: Date.now(),
-      ...novoDiario
-    };
-    
-    setDiarios([diario, ...diarios]);
-    setNovoDiario({
-      data: '',
-      humor: 'neutro',
-      disciplina: '5',
-      acertos: '',
-      erros: '',
-      aprendizados: '',
-      observacoes: ''
-    });
+    try {
+      const response = await fetch(`${API_URL}/diarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          data: novoDiario.data,
+          humor: novoDiario.humor,
+          disciplina: parseInt(novoDiario.disciplina),
+          acertos: novoDiario.acertos || null,
+          erros: novoDiario.erros || null,
+          aprendizados: novoDiario.aprendizados || null,
+          observacoes: novoDiario.observacoes || null
+        })
+      });
+
+      if (response.ok) {
+        await loadUserData(currentUser.id);
+        setNovoDiario({
+          data: '',
+          humor: 'neutro',
+          disciplina: '5',
+          acertos: '',
+          erros: '',
+          aprendizados: '',
+          observacoes: ''
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar diário:', error);
+      alert('Erro ao adicionar diário');
+    }
   };
 
-  const deletarOperacao = (id) => {
-    setOperacoes(operacoes.filter(op => op.id !== id));
+  // ========== DELETAR DIÁRIO ==========
+  const deletarDiario = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/diarios/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setDiarios(diarios.filter(d => d.id !== id));
+      }
+    } catch (error) {
+      console.error('Erro ao deletar diário:', error);
+      alert('Erro ao deletar diário');
+    }
   };
 
-  const deletarDiario = (id) => {
-    setDiarios(diarios.filter(d => d.id !== id));
-  };
-
+  // ========== FILTROS ==========
   const filtrarOperacoes = () => {
     let ops = [...operacoes];
     
@@ -290,35 +439,36 @@ export default function DayTradeMonitor() {
         });
         break;
       case 'wins':
-        ops = ops.filter(op => parseFloat(op.resultadoFinal) > 0);
+        ops = ops.filter(op => parseFloat(op.resultado_final) > 0);
         break;
       case 'losses':
-        ops = ops.filter(op => parseFloat(op.resultadoFinal) < 0);
+        ops = ops.filter(op => parseFloat(op.resultado_final) < 0);
         break;
     }
     
     return ops;
   };
 
+  // ========== ESTATÍSTICAS ==========
   const calcularEstatisticas = () => {
     const operacoesFiltradas = filtrarOperacoes();
     const totalOperacoes = operacoesFiltradas.length;
-    const lucroTotal = operacoesFiltradas.reduce((acc, op) => acc + parseFloat(op.resultadoFinal), 0);
-    const custosTotal = operacoesFiltradas.reduce((acc, op) => acc + parseFloat(op.custoTotal), 0);
+    const lucroTotal = operacoesFiltradas.reduce((acc, op) => acc + parseFloat(op.resultado_final), 0);
+    const custosTotal = operacoesFiltradas.reduce((acc, op) => acc + parseFloat(op.custo_total), 0);
     const impostoTotal = operacoesFiltradas.reduce((acc, op) => acc + parseFloat(op.imposto), 0);
-    const wins = operacoesFiltradas.filter(op => parseFloat(op.resultadoFinal) > 0).length;
-    const losses = operacoesFiltradas.filter(op => parseFloat(op.resultadoFinal) < 0).length;
+    const wins = operacoesFiltradas.filter(op => parseFloat(op.resultado_final) > 0).length;
+    const losses = operacoesFiltradas.filter(op => parseFloat(op.resultado_final) < 0).length;
     const taxaAcerto = totalOperacoes > 0 ? (wins / totalOperacoes * 100).toFixed(1) : 0;
     
-    const operacoesWin = operacoesFiltradas.filter(op => parseFloat(op.resultadoFinal) > 0);
-    const operacoesLoss = operacoesFiltradas.filter(op => parseFloat(op.resultadoFinal) < 0);
-    const lucroMedio = wins > 0 ? operacoesWin.reduce((acc, op) => acc + parseFloat(op.resultadoFinal), 0) / wins : 0;
-    const prejuizoMedio = losses > 0 ? Math.abs(operacoesLoss.reduce((acc, op) => acc + parseFloat(op.resultadoFinal), 0) / losses) : 0;
+    const operacoesWin = operacoesFiltradas.filter(op => parseFloat(op.resultado_final) > 0);
+    const operacoesLoss = operacoesFiltradas.filter(op => parseFloat(op.resultado_final) < 0);
+    const lucroMedio = wins > 0 ? operacoesWin.reduce((acc, op) => acc + parseFloat(op.resultado_final), 0) / wins : 0;
+    const prejuizoMedio = losses > 0 ? Math.abs(operacoesLoss.reduce((acc, op) => acc + parseFloat(op.resultado_final), 0) / losses) : 0;
     
     const payoff = prejuizoMedio > 0 ? (lucroMedio / prejuizoMedio).toFixed(2) : 0;
     
-    const maiorGain = operacoesFiltradas.length > 0 ? Math.max(...operacoesFiltradas.map(op => parseFloat(op.resultadoFinal))) : 0;
-    const maiorLoss = operacoesFiltradas.length > 0 ? Math.min(...operacoesFiltradas.map(op => parseFloat(op.resultadoFinal))) : 0;
+    const maiorGain = operacoesFiltradas.length > 0 ? Math.max(...operacoesFiltradas.map(op => parseFloat(op.resultado_final))) : 0;
+    const maiorLoss = operacoesFiltradas.length > 0 ? Math.min(...operacoesFiltradas.map(op => parseFloat(op.resultado_final))) : 0;
     
     return { 
       totalOperacoes, 
@@ -336,6 +486,7 @@ export default function DayTradeMonitor() {
     };
   };
 
+  // ========== EXPORTAR CSV ==========
   const exportarCSV = () => {
     const headers = ['Data', 'Ativo', 'Tipo', 'Quantidade', 'Preço Entrada', 'Preço Saída', 
                      'Stop Loss', 'Resultado Bruto', 'Corretagem', 'Emolumentos', 
@@ -346,16 +497,16 @@ export default function DayTradeMonitor() {
       op.ativo,
       op.tipo,
       op.quantidade,
-      op.precoEntrada,
-      op.precoSaida,
-      op.stopLoss || '-',
-      op.resultadoBruto,
+      op.preco_entrada,
+      op.preco_saida,
+      op.stop_loss || '-',
+      op.resultado_bruto,
       op.corretagem,
       op.emolumentos,
-      op.taxaLiquidacao,
-      op.custoTotal,
+      op.taxa_liquidacao,
+      op.custo_total,
       op.imposto,
-      op.resultadoFinal,
+      op.resultado_final,
       (op.observacoes || '-').replace(/,/g, ';')
     ]);
     
@@ -364,7 +515,7 @@ export default function DayTradeMonitor() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `operacoes_${currentUser}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `operacoes_${currentUser.username}_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -373,7 +524,7 @@ export default function DayTradeMonitor() {
 
   const stats = calcularEstatisticas();
 
-  // Tela de Login
+  // ========== TELA DE LOGIN ==========
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
@@ -389,7 +540,6 @@ export default function DayTradeMonitor() {
           </div>
 
           {!showRegister ? (
-            // Login Form
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-white mb-4">Entrar</h2>
               
@@ -402,6 +552,7 @@ export default function DayTradeMonitor() {
                   onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
                   className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                   placeholder="Digite seu usuário"
+                  disabled={loading}
                 />
               </div>
 
@@ -414,6 +565,7 @@ export default function DayTradeMonitor() {
                   onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
                   className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                   placeholder="Digite sua senha"
+                  disabled={loading}
                 />
               </div>
 
@@ -425,9 +577,10 @@ export default function DayTradeMonitor() {
 
               <button
                 onClick={handleLogin}
-                className="w-full bg-blue-600 hover:bg-blue-700 rounded-lg px-6 py-3 font-medium transition-colors text-white"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 rounded-lg px-6 py-3 font-medium transition-colors text-white disabled:opacity-50"
               >
-                Entrar
+                {loading ? 'Entrando...' : 'Entrar'}
               </button>
 
               <div className="text-center">
@@ -443,7 +596,6 @@ export default function DayTradeMonitor() {
               </div>
             </div>
           ) : (
-            // Register Form
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-white mb-4">Criar Conta</h2>
               
@@ -455,6 +607,7 @@ export default function DayTradeMonitor() {
                   onChange={(e) => setRegisterForm({...registerForm, username: e.target.value})}
                   className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                   placeholder="Escolha um usuário"
+                  disabled={loading}
                 />
               </div>
 
@@ -466,6 +619,7 @@ export default function DayTradeMonitor() {
                   onChange={(e) => setRegisterForm({...registerForm, password: e.target.value})}
                   className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                   placeholder="Mínimo 4 caracteres"
+                  disabled={loading}
                 />
               </div>
 
@@ -478,6 +632,7 @@ export default function DayTradeMonitor() {
                   onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
                   className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                   placeholder="Digite a senha novamente"
+                  disabled={loading}
                 />
               </div>
 
@@ -489,9 +644,10 @@ export default function DayTradeMonitor() {
 
               <button
                 onClick={handleRegister}
-                className="w-full bg-green-600 hover:bg-green-700 rounded-lg px-6 py-3 font-medium transition-colors text-white"
+                disabled={loading}
+                className="w-full bg-green-600 hover:bg-green-700 rounded-lg px-6 py-3 font-medium transition-colors text-white disabled:opacity-50"
               >
-                Criar Conta
+                {loading ? 'Criando...' : 'Criar Conta'}
               </button>
 
               <div className="text-center">
@@ -510,7 +666,7 @@ export default function DayTradeMonitor() {
 
           <div className="mt-6 pt-6 border-t border-slate-700">
             <p className="text-slate-500 text-xs text-center">
-              🔒 Seus dados ficam salvos apenas no seu navegador
+              🔒 Dados salvos no PostgreSQL
             </p>
           </div>
         </div>
@@ -518,16 +674,22 @@ export default function DayTradeMonitor() {
     );
   }
 
-  // App Principal (após login)
+  // ========== APP PRINCIPAL ==========
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4">
       <div className="max-w-7xl mx-auto">
+        {loading && (
+          <div className="fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+            Carregando...
+          </div>
+        )}
+        
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
               Monitor Day Trade Pro
             </h1>
-            <p className="text-slate-400">Bem-vindo, <span className="text-blue-400 font-semibold">{currentUser}</span>!</p>
+            <p className="text-slate-400">Bem-vindo, <span className="text-blue-400 font-semibold">{currentUser.username}</span>!</p>
           </div>
           <button
             onClick={handleLogout}
@@ -557,7 +719,6 @@ export default function DayTradeMonitor() {
                 <p className={`text-2xl font-bold ${stats.lucroTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   R$ {stats.lucroTotal.toFixed(2)}
                 </p>
-                <p className="text-slate-500 text-xs mt-1">após custos</p>
               </div>
               <DollarSign className={stats.lucroTotal >= 0 ? 'text-green-400' : 'text-red-400'} size={32} />
             </div>
@@ -567,10 +728,7 @@ export default function DayTradeMonitor() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">Payoff</p>
-                <p className="text-2xl font-bold text-purple-400">
-                  {stats.payoff}
-                </p>
-                <p className="text-slate-500 text-xs mt-1">L/P médio</p>
+                <p className="text-2xl font-bold text-purple-400">{stats.payoff}</p>
               </div>
               <TrendingUp className="text-purple-400" size={32} />
             </div>
@@ -581,7 +739,6 @@ export default function DayTradeMonitor() {
               <div>
                 <p className="text-slate-400 text-sm">Taxa Acerto</p>
                 <p className="text-2xl font-bold text-yellow-400">{stats.taxaAcerto}%</p>
-                <p className="text-slate-500 text-xs mt-1">win rate</p>
               </div>
               <Target className="text-yellow-400" size={32} />
             </div>
@@ -592,7 +749,6 @@ export default function DayTradeMonitor() {
               <div>
                 <p className="text-slate-400 text-sm">Impostos</p>
                 <p className="text-xl font-bold text-orange-400">R$ {stats.impostoTotal.toFixed(2)}</p>
-                <p className="text-slate-500 text-xs mt-1">a pagar</p>
               </div>
               <AlertCircle className="text-orange-400" size={32} />
             </div>
@@ -622,7 +778,7 @@ export default function DayTradeMonitor() {
         </div>
 
         <div className="flex gap-2 mb-6 overflow-x-auto">
-          {['operacoes', 'estatisticas', 'risco', 'diario'].map(tab => (
+          {['operacoes', 'risco'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -633,9 +789,7 @@ export default function DayTradeMonitor() {
               }`}
             >
               {tab === 'operacoes' && '📊 Operações'}
-              {tab === 'estatisticas' && '📈 Estatísticas'}
               {tab === 'risco' && '🎯 Gerenciamento'}
-              {tab === 'diario' && '📔 Diário'}
             </button>
           ))}
         </div>
@@ -710,7 +864,7 @@ export default function DayTradeMonitor() {
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="Stop Loss (opcional)"
+                      placeholder="Stop Loss"
                       value={novaOperacao.stopLoss}
                       onChange={(e) => setNovaOperacao({...novaOperacao, stopLoss: e.target.value})}
                       className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-yellow-500 focus:outline-none"
@@ -760,7 +914,8 @@ export default function DayTradeMonitor() {
                 
                 <button
                   onClick={adicionarOperacao}
-                  className="w-full bg-blue-600 hover:bg-blue-700 rounded-lg px-6 py-3 font-medium flex items-center justify-center gap-2 transition-colors"
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 rounded-lg px-6 py-3 font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
                   <PlusCircle size={20} />
                   Adicionar Operação
@@ -843,17 +998,17 @@ export default function DayTradeMonitor() {
                             {op.tipo === 'compra' ? 'LONG' : 'SHORT'}
                           </span>
                           <span className="text-slate-400 text-sm">{op.data}</span>
-                          {op.stopLoss && (
+                          {op.stop_loss && (
                             <span className="px-2 py-1 bg-yellow-600/30 text-yellow-400 rounded text-xs">
-                              SL: R$ {parseFloat(op.stopLoss).toFixed(2)}
+                              SL: R$ {parseFloat(op.stop_loss).toFixed(2)}
                             </span>
                           )}
                         </div>
                         
                         <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-3 rounded-lg border-2 border-slate-600">
                           <span className="text-slate-400 text-sm">Resultado Final:</span>
-                          <span className={`ml-3 text-2xl font-bold ${parseFloat(op.resultadoFinal) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            R$ {op.resultadoFinal}
+                          <span className={`ml-3 text-2xl font-bold ${parseFloat(op.resultado_final) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            R$ {parseFloat(op.resultado_final).toFixed(2)}
                           </span>
                         </div>
                         
@@ -877,172 +1032,6 @@ export default function DayTradeMonitor() {
                     {operacoes.length === 0 ? 'Nenhuma operação registrada ainda' : 'Nenhuma operação encontrada'}
                   </p>
                 )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'estatisticas' && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <TrendingUp size={24} />
-                Análise Estatística Completa
-              </h2>
-
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold mb-4 text-blue-400">Performance por Ativo</h3>
-                {(() => {
-                  const ativoStats = {};
-                  operacoes.forEach(op => {
-                    if (!ativoStats[op.ativo]) {
-                      ativoStats[op.ativo] = { 
-                        wins: 0, 
-                        losses: 0, 
-                        lucro: 0,
-                        operacoes: 0
-                      };
-                    }
-                    ativoStats[op.ativo].operacoes++;
-                    ativoStats[op.ativo].lucro += parseFloat(op.resultadoFinal);
-                    if (parseFloat(op.resultadoFinal) > 0) {
-                      ativoStats[op.ativo].wins++;
-                    } else if (parseFloat(op.resultadoFinal) < 0) {
-                      ativoStats[op.ativo].losses++;
-                    }
-                  });
-
-                  return Object.keys(ativoStats).length > 0 ? (
-                    <div className="space-y-3">
-                      {Object.entries(ativoStats)
-                        .sort((a, b) => b[1].lucro - a[1].lucro)
-                        .map(([ativo, dados]) => {
-                          const taxaAcerto = dados.operacoes > 0 ? (dados.wins / dados.operacoes * 100).toFixed(1) : 0;
-                          return (
-                            <div key={ativo} className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="font-bold text-lg">{ativo}</span>
-                                <span className={`text-xl font-bold ${dados.lucro >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  R$ {dados.lucro.toFixed(2)}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-3 gap-4 text-sm">
-                                <div>
-                                  <span className="text-slate-400">Operações:</span>
-                                  <span className="ml-2 font-semibold">{dados.operacoes}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400">Acerto:</span>
-                                  <span className="ml-2 font-semibold text-blue-400">{taxaAcerto}%</span>
-                                </div>
-                                <div>
-                                  <span className="text-green-400">W:{dados.wins}</span>
-                                  <span className="mx-2 text-slate-500">/</span>
-                                  <span className="text-red-400">L:{dados.losses}</span>
-                                </div>
-                              </div>
-                              <div className="mt-2 h-2 bg-slate-800 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full ${dados.lucro >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                                  style={{ 
-                                    width: `${Math.min(Math.abs(dados.lucro) / 100, 100)}%` 
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 text-center py-8">Nenhum dado disponível ainda</p>
-                  );
-                })()}
-              </div>
-
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold mb-4 text-blue-400">Performance Mensal</h3>
-                {(() => {
-                  const mesesStats = {};
-                  operacoes.forEach(op => {
-                    const data = new Date(op.data + 'T00:00:00');
-                    const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
-                    if (!mesesStats[mesAno]) {
-                      mesesStats[mesAno] = { lucro: 0, operacoes: 0, wins: 0, losses: 0 };
-                    }
-                    mesesStats[mesAno].lucro += parseFloat(op.resultadoFinal);
-                    mesesStats[mesAno].operacoes++;
-                    if (parseFloat(op.resultadoFinal) > 0) mesesStats[mesAno].wins++;
-                    else if (parseFloat(op.resultadoFinal) < 0) mesesStats[mesAno].losses++;
-                  });
-
-                  const mesesOrdenados = Object.entries(mesesStats).sort((a, b) => b[0].localeCompare(a[0]));
-
-                  return mesesOrdenados.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {mesesOrdenados.map(([mes, dados]) => {
-                        const [ano, mesNum] = mes.split('-');
-                        const nomeMes = new Date(ano, mesNum - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                        const taxaAcerto = dados.operacoes > 0 ? (dados.wins / dados.operacoes * 100).toFixed(1) : 0;
-                        
-                        return (
-                          <div key={mes} className={`rounded-lg p-4 border ${dados.lucro >= 0 ? 'bg-green-900/20 border-green-700/50' : 'bg-red-900/20 border-red-700/50'}`}>
-                            <h4 className="font-semibold capitalize mb-2">{nomeMes}</h4>
-                            <p className={`text-2xl font-bold mb-2 ${dados.lucro >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              R$ {dados.lucro.toFixed(2)}
-                            </p>
-                            <div className="text-sm space-y-1">
-                              <p className="text-slate-400">
-                                {dados.operacoes} operações · {taxaAcerto}% acerto
-                              </p>
-                              <p>
-                                <span className="text-green-400">✓ {dados.wins}</span>
-                                <span className="mx-2 text-slate-500">/</span>
-                                <span className="text-red-400">✗ {dados.losses}</span>
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 text-center py-8">Nenhum dado disponível ainda</p>
-                  );
-                })()}
-              </div>
-
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold mb-4 text-blue-400">Análise Avançada</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
-                    <h4 className="text-slate-400 text-sm mb-2">Expectativa Matemática</h4>
-                    <p className="text-2xl font-bold text-purple-400">
-                      R$ {stats.totalOperacoes > 0 ? (stats.lucroTotal / stats.totalOperacoes).toFixed(2) : '0.00'}
-                    </p>
-                    <p className="text-slate-500 text-xs mt-1">por operação</p>
-                  </div>
-                  
-                  <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
-                    <h4 className="text-slate-400 text-sm mb-2">Fator de Lucro</h4>
-                    <p className="text-2xl font-bold text-cyan-400">
-                      {(() => {
-                        const totalWins = operacoes.filter(op => parseFloat(op.resultadoFinal) > 0)
-                          .reduce((acc, op) => acc + parseFloat(op.resultadoFinal), 0);
-                        const totalLosses = Math.abs(operacoes.filter(op => parseFloat(op.resultadoFinal) < 0)
-                          .reduce((acc, op) => acc + parseFloat(op.resultadoFinal), 0));
-                        return totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : '0.00';
-                      })()}
-                    </p>
-                    <p className="text-slate-500 text-xs mt-1">lucro / prejuízo</p>
-                  </div>
-                  
-                  <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
-                    <h4 className="text-slate-400 text-sm mb-2">ROI Total</h4>
-                    <p className="text-2xl font-bold text-yellow-400">
-                      {configuracaoRisco.capitalTotal ? 
-                        ((stats.lucroTotal / parseFloat(configuracaoRisco.capitalTotal)) * 100).toFixed(2) 
-                        : '0.00'}%
-                    </p>
-                    <p className="text-slate-500 text-xs mt-1">sobre capital</p>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -1133,119 +1122,11 @@ export default function DayTradeMonitor() {
               </div>
             </div>
           )}
+        </div>
 
-          {activeTab === 'diario' && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <BookOpen size={24} />
-                Diário de Trading
-              </h2>
-              
-              <div className="mb-8 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <input
-                    type="date"
-                    value={novoDiario.data}
-                    onChange={(e) => setNovoDiario({...novoDiario, data: e.target.value})}
-                    className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none"
-                  />
-                  
-                  <select
-                    value={novoDiario.humor}
-                    onChange={(e) => setNovoDiario({...novoDiario, humor: e.target.value})}
-                    className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="otimo">😊 Ótimo</option>
-                    <option value="bom">🙂 Bom</option>
-                    <option value="neutro">😐 Neutro</option>
-                    <option value="ruim">😟 Ruim</option>
-                    <option value="pessimo">😞 Péssimo</option>
-                  </select>
-                  
-                  <div>
-                    <label className="block text-slate-400 text-sm mb-1">Disciplina (1-10)</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      value={novoDiario.disciplina}
-                      onChange={(e) => setNovoDiario({...novoDiario, disciplina: e.target.value})}
-                      className="w-full"
-                    />
-                    <div className="text-center text-2xl font-bold text-blue-400">{novoDiario.disciplina}</div>
-                  </div>
-                </div>
-                
-                <textarea
-                  placeholder="O que fiz certo hoje?"
-                  value={novoDiario.acertos}
-                  onChange={(e) => setNovoDiario({...novoDiario, acertos: e.target.value})}
-                  className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none"
-                  rows="3"
-                />
-                
-                <textarea
-                  placeholder="O que fiz errado hoje?"
-                  value={novoDiario.erros}
-                  onChange={(e) => setNovoDiario({...novoDiario, erros: e.target.value})}
-                  className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none"
-                  rows="3"
-                />
-                
-                <button
-                  onClick={adicionarDiario}
-                  className="w-full bg-blue-600 hover:bg-blue-700 rounded-lg px-6 py-3 font-medium flex items-center justify-center gap-2 transition-colors"
-                >
-                  <PlusCircle size={20} />
-                  Salvar Diário
-                </button>
-              </div>
-
-              <h3 className="text-xl font-bold mb-4">Histórico do Diário</h3>
-              <div className="space-y-4">
-                {diarios.map(diario => (
-                  <div key={diario.id} className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-slate-400">{diario.data}</span>
-                        <span className="text-2xl">
-                          {diario.humor === 'otimo' && '😊'}
-                          {diario.humor === 'bom' && '🙂'}
-                          {diario.humor === 'neutro' && '😐'}
-                          {diario.humor === 'ruim' && '😟'}
-                          {diario.humor === 'pessimo' && '😞'}
-                        </span>
-                        <span className="text-slate-400">Disciplina: <span className="text-blue-400 font-bold">{diario.disciplina}/10</span></span>
-                      </div>
-                      <button
-                        onClick={() => deletarDiario(diario.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                    
-                    {diario.acertos && (
-                      <div className="mb-2">
-                        <p className="text-green-400 font-medium">✓ Acertos:</p>
-                        <p className="text-slate-300">{diario.acertos}</p>
-                      </div>
-                    )}
-                    
-                    {diario.erros && (
-                      <div className="mb-2">
-                        <p className="text-red-400 font-medium">✗ Erros:</p>
-                        <p className="text-slate-300">{diario.erros}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {diarios.length === 0 && (
-                  <p className="text-slate-400 text-center py-8">Nenhum registro no diário ainda</p>
-                )}
-              </div>
-            </div>
-          )}
+        <div className="mt-8 text-center text-slate-500 text-sm">
+          <p>🔗 Conectado ao PostgreSQL no EasyPanel</p>
+          <p className="text-xs mt-1">Configure: const API_URL no código</p>
         </div>
       </div>
     </div>
