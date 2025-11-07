@@ -24,16 +24,17 @@ export default function DayTradeMonitor() {
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [operacaoExpandida, setOperacaoExpandida] = useState(null);
   const [mostrarEstatisticasAvancadas, setMostrarEstatisticasAvancadas] = useState(false);
-  const [novaOperacao, setNovaOperacao] = useState({
-    data: '',
-    ativo: '',
-    tipo: 'compra',
-    quantidade: '',
-    precoEntrada: '',
-    precoSaida: '',
-    stopLoss: '',
-    observacoes: ''
-  });
+const [novaOperacao, setNovaOperacao] = useState({
+  data: '',
+  ativo: '',
+  tipo: 'compra',
+  tipoMercado: 'acoes', // 'acoes', 'indice', 'cripto'
+  quantidade: '',
+  precoEntrada: '',
+  precoSaida: '',
+  stopLoss: '',
+  observacoes: ''
+});
   const [novoDiario, setNovoDiario] = useState({
     data: '',
     humor: 'neutro',
@@ -229,49 +230,56 @@ export default function DayTradeMonitor() {
   };
 
   // ========== CÁLCULOS ==========
-  const calcularOperacao = (operacao = novaOperacao) => {
-    const qtd = parseFloat(operacao.quantidade) || 0;
-    const entrada = parseFloat(operacao.precoEntrada) || 0;
-    const saida = parseFloat(operacao.precoSaida) || 0;
-    const multiplicador = operacao.tipo === 'compra' ? 1 : -1;
-    const resultadoBruto = (saida - entrada) * qtd * multiplicador;
-    
-    // Corretagem: cobrada 2x (entrada + saída)
-    const corretagemPadrao = parseFloat(configuracaoRisco.corretgemPadrao) || 0;
-    const corretagem = corretagemPadrao * 2;
-    
-    // Volume de entrada e saída separados
-    const volumeEntrada = entrada * qtd;
-    const volumeSaida = saida * qtd;
-    
-    // Emolumentos: cobrados sobre entrada e saída
-    const taxaEmolumentos = parseFloat(configuracaoRisco.emolumentosPadrao) / 100;
-    const emolumentosEntrada = volumeEntrada * taxaEmolumentos;
-    const emolumentosSaida = volumeSaida * taxaEmolumentos;
-    const emolumentos = emolumentosEntrada + emolumentosSaida;
-    
-    // Taxa de Liquidação: cobrada sobre entrada e saída
-    const taxaLiquidacaoPerc = parseFloat(configuracaoRisco.taxaLiquidacaoPadrao) / 100;
-    const taxaLiquidacaoEntrada = volumeEntrada * taxaLiquidacaoPerc;
-    const taxaLiquidacaoSaida = volumeSaida * taxaLiquidacaoPerc;
-    const taxaLiquidacao = taxaLiquidacaoEntrada + taxaLiquidacaoSaida;
-    
-    const custoTotal = corretagem + emolumentos + taxaLiquidacao;
-    const resultadoLiquido = resultadoBruto - custoTotal;
-    const imposto = resultadoLiquido > 0 ? resultadoLiquido * 0.20 : 0;
-    const resultadoFinal = resultadoLiquido - imposto;
-    
-    return {
-      resultadoBruto: resultadoBruto.toFixed(2),
-      corretagem: corretagem.toFixed(2),
-      emolumentos: emolumentos.toFixed(2),
-      taxaLiquidacao: taxaLiquidacao.toFixed(2),
-      custoTotal: custoTotal.toFixed(2),
-      resultadoLiquido: resultadoLiquido.toFixed(2),
-      imposto: imposto.toFixed(2),
-      resultadoFinal: resultadoFinal.toFixed(2)
+    const calcularOperacao = (operacao = novaOperacao) => {
+      const qtd = parseFloat(operacao.quantidade) || 0;
+      const entrada = parseFloat(operacao.precoEntrada) || 0;
+      const saida = parseFloat(operacao.precoSaida) || 0;
+      const multiplicador = operacao.tipo === 'compra' ? 1 : -1;
+
+      // --- Cálculo do volume e resultado bruto por tipo de mercado ---
+      let volumeEntrada = 0;
+      let volumeSaida = 0;
+      let resultadoBruto = 0;
+
+      if (operacao.tipoMercado === 'indice') {
+        // Para índices: cada ponto = R$1,00
+        // Ex: 1 contrato comprado em 115000 e vendido em 115200 → ganho de 200 pts = R$200
+        resultadoBruto = (saida - entrada) * qtd * multiplicador * 0.2; // R$1 por ponto
+        volumeEntrada = entrada * qtd * 1.0;
+        volumeSaida = saida * qtd * 1.0;
+      } else {
+        // Ações e Cripto: preço unitário × quantidade
+        resultadoBruto = (saida - entrada) * qtd * multiplicador;
+        volumeEntrada = entrada * qtd;
+        volumeSaida = saida * qtd;
+      }
+
+      // --- Cálculo das taxas ---
+      const corretagemPadrao = parseFloat(configuracaoRisco.corretgemPadrao) || 0;
+      const corretagem = corretagemPadrao * 2;
+
+      const taxaEmolumentos = parseFloat(configuracaoRisco.emolumentosPadrao) / 100;
+      const emolumentos = (volumeEntrada + volumeSaida) * taxaEmolumentos;
+
+      const taxaLiquidacaoPerc = parseFloat(configuracaoRisco.taxaLiquidacaoPadrao) / 100;
+      const taxaLiquidacao = (volumeEntrada + volumeSaida) * taxaLiquidacaoPerc;
+
+      const custoTotal = corretagem + emolumentos + taxaLiquidacao;
+      const resultadoLiquido = resultadoBruto - custoTotal;
+      const imposto = resultadoLiquido > 0 ? resultadoLiquido * 0.20 : 0;
+      const resultadoFinal = resultadoLiquido - imposto;
+
+      return {
+        resultadoBruto: resultadoBruto.toFixed(2),
+        corretagem: corretagem.toFixed(2),
+        emolumentos: emolumentos.toFixed(2),
+        taxaLiquidacao: taxaLiquidacao.toFixed(2),
+        custoTotal: custoTotal.toFixed(2),
+        resultadoLiquido: resultadoLiquido.toFixed(2),
+        imposto: imposto.toFixed(2),
+        resultadoFinal: resultadoFinal.toFixed(2)
+      };
     };
-  };
 
   // ========== ADICIONAR OPERAÇÃO ==========
   const adicionarOperacao = async () => {
@@ -289,6 +297,7 @@ export default function DayTradeMonitor() {
           user_id: currentUser.id,
           data: novaOperacao.data,
           ativo: novaOperacao.ativo,
+          tipo_mercado: novaOperacao.tipoMercado,
           tipo: novaOperacao.tipo,
           quantidade: parseInt(novaOperacao.quantidade),
           preco_entrada: parseFloat(novaOperacao.precoEntrada),
@@ -593,7 +602,7 @@ export default function DayTradeMonitor() {
               <TrendingUp size={48} className="text-blue-400" />
             </div>
             <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-              Monitor Day Trade Pro
+            Day Trade Pro
             </h1>
             <p className="text-slate-400">Gerencie suas operações com segurança</p>
           </div>
@@ -636,7 +645,7 @@ export default function DayTradeMonitor() {
               >
                 {loading ? 'Entrando...' : 'Entrar'}
               </button>
-              <div className="text-center">
+              {/* <div className="text-center">
                 <button
                   onClick={() => {
                     setShowRegister(true);
@@ -646,7 +655,7 @@ export default function DayTradeMonitor() {
                 >
                   Não tem conta? Cadastre-se
                 </button>
-              </div>
+              </div> */}
             </div>
           ) : (
             <div className="space-y-4">
@@ -712,7 +721,7 @@ export default function DayTradeMonitor() {
           )}
           <div className="mt-6 pt-6 border-t border-slate-700">
             <p className="text-slate-500 text-xs text-center">
-              🔒 Dados salvos no PostgreSQL
+              🔒 Não tem conta? Contate o administrador do sistema.
             </p>
           </div>
         </div>
@@ -973,16 +982,25 @@ export default function DayTradeMonitor() {
               <div className="mb-8 space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold mb-3 text-blue-400">Dados da Operação</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <input
                       type="date"
                       value={novaOperacao.data}
                       onChange={(e) => setNovaOperacao({...novaOperacao, data: e.target.value})}
                       className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                     />
+                    <select
+                      value={novaOperacao.tipoMercado}
+                      onChange={(e) => setNovaOperacao({...novaOperacao, tipoMercado: e.target.value})}
+                      className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
+                    >
+                      <option value="acoes">📊 Ações </option>
+                      <option value="indice">📈 Índice </option>
+                      <option value="cripto">💰 Cripto </option>
+                    </select>
                     <input
                       type="text"
-                      placeholder="Ativo (ex: PETR4)"
+                      placeholder="Ativo "
                       value={novaOperacao.ativo}
                       onChange={(e) => setNovaOperacao({...novaOperacao, ativo: e.target.value.toUpperCase()})}
                       className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
@@ -992,47 +1010,68 @@ export default function DayTradeMonitor() {
                       onChange={(e) => setNovaOperacao({...novaOperacao, tipo: e.target.value})}
                       className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                     >
-                      <option value="compra">Compra (Long)</option>
-                      <option value="venda">Venda (Short)</option>
+                      <option value="compra">Compra </option>
+                      <option value="venda">Venda </option>
                     </select>
                   </div>
                 </div>
+
                 <div>
                   <h3 className="text-lg font-semibold mb-3 text-blue-400">Preços e Quantidade</h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Quantidade */}
                     <input
                       type="number"
-                      placeholder="Quantidade"
+                      step={novaOperacao.tipoMercado === 'cripto' ? '0.000001' : '1'}
+                      placeholder={
+                        novaOperacao.tipoMercado === 'acoes' ? 'Quantidade (ex: 100)' :
+                        novaOperacao.tipoMercado === 'indice' ? 'Contratos (ex: 1)' :
+                        'Quantidade (ex: 0.05)'
+                      }
                       value={novaOperacao.quantidade}
                       onChange={(e) => setNovaOperacao({...novaOperacao, quantidade: e.target.value})}
                       className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                     />
+                    {/* Preço Entrada */}
                     <input
                       type="number"
-                      step="0.01"
-                      placeholder="Preço de Entrada"
+                      step={novaOperacao.tipoMercado === 'cripto' ? '0.01' : novaOperacao.tipoMercado === 'indice' ? '1' : '0.01'}
+                      placeholder={
+                        novaOperacao.tipoMercado === 'acoes' ? 'Preço Entrada R$/ação' :
+                        novaOperacao.tipoMercado === 'indice' ? 'Entrada em Pontos (ex: 115000)' :
+                        'Preço Entrada R$/moeda'
+                      }
                       value={novaOperacao.precoEntrada}
                       onChange={(e) => setNovaOperacao({...novaOperacao, precoEntrada: e.target.value})}
                       className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                     />
+                    {/* Preço Saída */}
                     <input
                       type="number"
-                      step="0.01"
-                      placeholder="Preço de Saída"
+                      step={novaOperacao.tipoMercado === 'cripto' ? '0.01' : novaOperacao.tipoMercado === 'indice' ? '1' : '0.01'}
+                      placeholder={
+                        novaOperacao.tipoMercado === 'acoes' ? 'Preço Saída R$/ação' :
+                        novaOperacao.tipoMercado === 'indice' ? 'Saída em Pontos (ex: 115200)' :
+                        'Preço Saída R$/moeda'
+                      }
                       value={novaOperacao.precoSaida}
                       onChange={(e) => setNovaOperacao({...novaOperacao, precoSaida: e.target.value})}
                       className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                     />
+                    {/* Stop Loss */}
                     <input
                       type="number"
-                      step="0.01"
-                      placeholder="Stop Loss"
+                      step={novaOperacao.tipoMercado === 'indice' ? '1' : '0.01'}
+                      placeholder={
+                        novaOperacao.tipoMercado === 'indice' ? 'Stop Loss em Pontos' : 'Stop Loss'
+                      }
                       value={novaOperacao.stopLoss}
                       onChange={(e) => setNovaOperacao({...novaOperacao, stopLoss: e.target.value})}
                       className="bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-yellow-500 focus:outline-none text-white"
                     />
                   </div>
                 </div>
+
                 {novaOperacao.quantidade && novaOperacao.precoEntrada && novaOperacao.precoSaida && (
                   <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
                     <h3 className="text-lg font-semibold mb-3 text-green-400">Preview do Resultado</h3>
@@ -1064,6 +1103,7 @@ export default function DayTradeMonitor() {
                     </div>
                   </div>
                 )}
+
                 <textarea
                   placeholder="Observações sobre a operação"
                   value={novaOperacao.observacoes}
@@ -1071,6 +1111,7 @@ export default function DayTradeMonitor() {
                   className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                   rows="3"
                 />
+
                 <button
                   onClick={adicionarOperacao}
                   disabled={loading}
@@ -1080,6 +1121,8 @@ export default function DayTradeMonitor() {
                   Adicionar Operação
                 </button>
               </div>
+
+              {/* Restante do histórico de operações (sem alterações) */}
               <h3 className="text-xl font-bold mb-4">Histórico de Operações</h3>
               <div className="mb-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -1137,6 +1180,7 @@ export default function DayTradeMonitor() {
                   </div>
                 )}
               </div>
+
               <div className="space-y-3">
                 {filtrarOperacoes().map(op => (
                   <div key={op.id}>
