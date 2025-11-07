@@ -48,7 +48,7 @@ export default function DayTradeMonitor() {
     riscoPorOperacao: '2',
     metaDiaria: '',
     perdaMaximaDiaria: '',
-    corretgemPadrao: '10',
+    corretgemPadrao: '0.50',
     emolumentosPadrao: '0.0325',
     taxaLiquidacaoPadrao: '0.0275'
   });
@@ -82,7 +82,7 @@ export default function DayTradeMonitor() {
             riscoPorOperacao: configData.risco_por_operacao || '2',
             metaDiaria: configData.meta_diaria || '',
             perdaMaximaDiaria: configData.perda_maxima_diaria || '',
-            corretgemPadrao: configData.corretagem_padrao || '10',
+            corretgemPadrao: configData.corretagem_padrao || '0.50',
             emolumentosPadrao: configData.emolumentos_padrao || '0.0325',
             taxaLiquidacaoPadrao: configData.taxa_liquidacao_padrao || '0.0275'
           });
@@ -114,7 +114,7 @@ export default function DayTradeMonitor() {
               risco_por_operacao: parseFloat(configuracaoRisco.riscoPorOperacao) || 2,
               meta_diaria: parseFloat(configuracaoRisco.metaDiaria) || null,
               perda_maxima_diaria: parseFloat(configuracaoRisco.perdaMaximaDiaria) || null,
-              corretagem_padrao: parseFloat(configuracaoRisco.corretgemPadrao) || 10,
+              corretagem_padrao: parseFloat(configuracaoRisco.corretgemPadrao) || 0.50,
               emolumentos_padrao: parseFloat(configuracaoRisco.emolumentosPadrao) || 0.0325,
               taxa_liquidacao_padrao: parseFloat(configuracaoRisco.taxaLiquidacaoPadrao) || 0.0275
             })
@@ -222,7 +222,7 @@ export default function DayTradeMonitor() {
       riscoPorOperacao: '2',
       metaDiaria: '',
       perdaMaximaDiaria: '',
-      corretgemPadrao: '10',
+      corretgemPadrao: '0.50',
       emolumentosPadrao: '0.0325',
       taxaLiquidacaoPadrao: '0.0275'
     });
@@ -235,14 +235,32 @@ export default function DayTradeMonitor() {
     const saida = parseFloat(operacao.precoSaida) || 0;
     const multiplicador = operacao.tipo === 'compra' ? 1 : -1;
     const resultadoBruto = (saida - entrada) * qtd * multiplicador;
-    const corretagem = parseFloat(configuracaoRisco.corretgemPadrao) || 0;
-    const volumeTotal = (entrada * qtd) + (saida * qtd);
-    const emolumentos = volumeTotal * (parseFloat(configuracaoRisco.emolumentosPadrao) / 100);
-    const taxaLiquidacao = volumeTotal * (parseFloat(configuracaoRisco.taxaLiquidacaoPadrao) / 100);
+    
+    // Corretagem: cobrada 2x (entrada + saída)
+    const corretagemPadrao = parseFloat(configuracaoRisco.corretgemPadrao) || 0;
+    const corretagem = corretagemPadrao * 2;
+    
+    // Volume de entrada e saída separados
+    const volumeEntrada = entrada * qtd;
+    const volumeSaida = saida * qtd;
+    
+    // Emolumentos: cobrados sobre entrada e saída
+    const taxaEmolumentos = parseFloat(configuracaoRisco.emolumentosPadrao) / 100;
+    const emolumentosEntrada = volumeEntrada * taxaEmolumentos;
+    const emolumentosSaida = volumeSaida * taxaEmolumentos;
+    const emolumentos = emolumentosEntrada + emolumentosSaida;
+    
+    // Taxa de Liquidação: cobrada sobre entrada e saída
+    const taxaLiquidacaoPerc = parseFloat(configuracaoRisco.taxaLiquidacaoPadrao) / 100;
+    const taxaLiquidacaoEntrada = volumeEntrada * taxaLiquidacaoPerc;
+    const taxaLiquidacaoSaida = volumeSaida * taxaLiquidacaoPerc;
+    const taxaLiquidacao = taxaLiquidacaoEntrada + taxaLiquidacaoSaida;
+    
     const custoTotal = corretagem + emolumentos + taxaLiquidacao;
     const resultadoLiquido = resultadoBruto - custoTotal;
     const imposto = resultadoLiquido > 0 ? resultadoLiquido * 0.20 : 0;
     const resultadoFinal = resultadoLiquido - imposto;
+    
     return {
       resultadoBruto: resultadoBruto.toFixed(2),
       corretagem: corretagem.toFixed(2),
@@ -1434,6 +1452,15 @@ export default function DayTradeMonitor() {
                 </div>
                 <div className="border-t border-slate-600 pt-6">
                   <h3 className="text-lg font-semibold mb-3 text-blue-400">Configuração de Taxas Padrão</h3>
+                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3 mb-4">
+                    <p className="text-blue-300 text-sm font-semibold mb-1">ℹ️ Como as taxas são calculadas:</p>
+                    <ul className="text-slate-300 text-xs space-y-1 ml-4">
+                      <li>• <strong>Corretagem:</strong> Cobrada 2x (entrada + saída) - valor fixo por operação</li>
+                      <li>• <strong>Emolumentos:</strong> Cobrados sobre o volume de entrada E saída (% do valor negociado)</li>
+                      <li>• <strong>Taxa de Liquidação:</strong> Cobrada sobre o volume de entrada E saída (% do valor negociado)</li>
+                      <li>• <strong>Imposto (IR):</strong> 20% sobre o lucro líquido (apenas se houver ganho)</li>
+                    </ul>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-slate-400 mb-2 text-sm">Corretagem (R$/operação)</label>
@@ -1444,7 +1471,7 @@ export default function DayTradeMonitor() {
                         onChange={(e) => setConfiguracaoRisco({...configuracaoRisco, corretgemPadrao: e.target.value})}
                         className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                       />
-                      <p className="text-slate-500 text-xs mt-1">Ex: 10 (R$ 10,00 por operação)</p>
+                      <p className="text-slate-500 text-xs mt-1">Ex: 0.50 (será cobrado R$ 1,00 total: R$ 0,50 entrada + R$ 0,50 saída)</p>
                     </div>
                     <div>
                       <label className="block text-slate-400 mb-2 text-sm">Emolumentos (%)</label>
@@ -1455,7 +1482,7 @@ export default function DayTradeMonitor() {
                         onChange={(e) => setConfiguracaoRisco({...configuracaoRisco, emolumentosPadrao: e.target.value})}
                         className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                       />
-                      <p className="text-slate-500 text-xs mt-1">Ex: 0.0325 (0.0325% do volume)</p>
+                      <p className="text-slate-500 text-xs mt-1">Ex: 0.0325 (cobrado na entrada e na saída)</p>
                     </div>
                     <div>
                       <label className="block text-slate-400 mb-2 text-sm">Taxa de Liquidação (%)</label>
@@ -1466,12 +1493,19 @@ export default function DayTradeMonitor() {
                         onChange={(e) => setConfiguracaoRisco({...configuracaoRisco, taxaLiquidacaoPadrao: e.target.value})}
                         className="w-full bg-slate-700 rounded-lg px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none text-white"
                       />
-                      <p className="text-slate-500 text-xs mt-1">Ex: 0.0275 (0.0275% do volume)</p>
+                      <p className="text-slate-500 text-xs mt-1">Ex: 0.0275 (cobrado na entrada e na saída)</p>
                     </div>
                   </div>
-                  <p className="text-slate-400 text-xs mt-3 p-2 bg-slate-700/50 rounded">
-                    💡 Dica: Customize essas taxas de acordo com sua corretora
-                  </p>
+                  <div className="mt-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
+                    <p className="text-yellow-300 text-xs">
+                      💡 <strong>Exemplo prático:</strong> Se você comprar 100 ações a R$ 10 e vender a R$ 11:
+                      <br/>• Volume entrada: R$ 1.000 | Volume saída: R$ 1.100
+                      <br/>• Corretagem: R$ 0,50 (entrada) + R$ 0,50 (saída) = R$ 1,00
+                      <br/>• Emolumentos: 0.0325% de R$ 1.000 + 0.0325% de R$ 1.100 = R$ 0,68
+                      <br/>• Taxa Liquidação: 0.0275% de R$ 1.000 + 0.0275% de R$ 1.100 = R$ 0,58
+                      <br/>• <strong>Custos totais: R$ 2,26</strong>
+                    </p>
+                  </div>
                 </div>
                 {configuracaoRisco.capitalTotal && (
                   <div className="border-t border-slate-600 pt-6">
