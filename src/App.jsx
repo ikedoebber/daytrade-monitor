@@ -1098,6 +1098,244 @@ const calcularOperacao = (operacao = novaOperacao) => {
               </button>
             </div>
 
+           {/* Cards de Gerenciamento de Risco */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                <Target className="text-purple-400" size={28} />
+                <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                  Gerenciamento de Risco
+                </span>
+              </h2>
+              <p className="text-slate-400 mb-4 text-sm">
+
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+                {/* Card 1 */}
+                <div className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-xl p-4 border-2 border-purple-600/50 hover:border-purple-500 transition-all hover:shadow-lg hover:shadow-purple-500/20">
+                  <div className="text-center mb-3">
+                    <div className="text-3xl mb-2">🚀</div>
+                    <p className="text-white text-2xl font-bold">R$ 500</p>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Risco/Op</p>
+                      <p className="text-red-400 font-bold">R$ 10,00</p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Gain Alvo</p>
+                      <p className="text-yellow-400 font-bold">R$ 20,00</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-purple-600/30 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-green-400">✓ Ganhos (16)</span>
+                      <span className="text-green-300 font-bold">R$ 320</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-red-400">✗ Perdas (4)</span>
+                      <span className="text-red-300 font-bold">R$ 40</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-purple-600/30">
+                      <span className="text-purple-300 font-semibold">Lucro Total</span>
+                      <span className="text-purple-200 font-bold text-base">R$ 280</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 2 */}
+                <div className="bg-gradient-to-br from-blue-900/40 to-cyan-900/40 rounded-xl p-4 border-2 border-blue-600/50 hover:border-blue-500 transition-all hover:shadow-lg hover:shadow-blue-500/20">
+                  <div className="text-center mb-3">
+                    <div className="text-3xl mb-2">💰</div>
+                    <p className="text-white text-2xl font-bold">R$ 1.000</p>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Risco/Op</p>
+                      <p className="text-red-400 font-bold">R$ 20,00</p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Gain Alvo</p>
+                      <p className="text-yellow-400 font-bold">R$ 40,00</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-blue-600/30 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-green-400">✓ Ganhos (16)</span>
+                      <span className="text-green-300 font-bold">R$ 640</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-red-400">✗ Perdas (4)</span>
+                      <span className="text-red-300 font-bold">R$ 80</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-blue-600/30">
+                      <span className="text-blue-300 font-semibold">Lucro Total</span>
+                      <span className="text-blue-200 font-bold text-base">R$ 560</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 3 */}
+                <div className="bg-gradient-to-br from-green-900/40 to-emerald-900/40 rounded-xl p-4 border-2 border-green-600/50 hover:border-green-500 transition-all hover:shadow-lg hover:shadow-green-500/20">
+                  <div className="text-center mb-3">
+                    <div className="text-3xl mb-2">💼</div>
+                    <p className="text-white text-2xl font-bold">R$ 3.000</p>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Risco/Op</p>
+                      <p className="text-red-400 font-bold">R$ 50,00</p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Gain Alvo</p>
+                      <p className="text-yellow-400 font-bold">R$ 1.000</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-green-600/30 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-green-400">✓ Ganhos (16)</span>
+                      <span className="text-green-300 font-bold">R$ 1.600</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-red-400">✗ Perdas (4)</span>
+                      <span className="text-red-300 font-bold">R$ 200</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-green-600/30">
+                      <span className="text-green-300 font-semibold">Lucro Total</span>
+                      <span className="text-green-200 font-bold text-base">R$ 1.400</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 4 */}
+                <div className="bg-gradient-to-br from-yellow-900/40 to-orange-900/40 rounded-xl p-4 border-2 border-yellow-600/50 hover:border-yellow-500 transition-all hover:shadow-lg hover:shadow-yellow-500/20">
+                  <div className="text-center mb-3">
+                    <div className="text-3xl mb-2">⭐</div>
+                    <p className="text-white text-2xl font-bold">R$ 5.000</p>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Risco/Op</p>
+                      <p className="text-red-400 font-bold">R$ 100,00</p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Gain Alvo</p>
+                      <p className="text-yellow-400 font-bold">R$ 200,00</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-yellow-600/30 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-green-400">✓ Ganhos (16)</span>
+                      <span className="text-green-300 font-bold">R$ 3.200</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-red-400">✗ Perdas (4)</span>
+                      <span className="text-red-300 font-bold">R$ 400</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-yellow-600/30">
+                      <span className="text-yellow-300 font-semibold">Lucro Total</span>
+                      <span className="text-yellow-200 font-bold text-base">R$ 2.800</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 5 */}
+                <div className="bg-gradient-to-br from-pink-900/40 to-rose-900/40 rounded-xl p-4 border-2 border-pink-600/50 hover:border-pink-500 transition-all hover:shadow-lg hover:shadow-pink-500/20">
+                  <div className="text-center mb-3">
+                    <div className="text-3xl mb-2">🔥</div>
+                    <p className="text-white text-2xl font-bold">R$ 10.000</p>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Risco/Op</p>
+                      <p className="text-red-400 font-bold">R$ 200,00</p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Gain Alvo</p>
+                      <p className="text-yellow-400 font-bold">R$ 400,00</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-pink-600/30 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-green-400">✓ Ganhos (16)</span>
+                      <span className="text-green-300 font-bold">R$ 6.400</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-red-400">✗ Perdas (4)</span>
+                      <span className="text-red-300 font-bold">R$ 800</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-pink-600/30">
+                      <span className="text-pink-300 font-semibold">Lucro Total</span>
+                      <span className="text-pink-200 font-bold text-base">R$ 5.600</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 6 */}
+                <div className="bg-gradient-to-br from-indigo-900/40 to-violet-900/40 rounded-xl p-4 border-2 border-indigo-600/50 hover:border-indigo-500 transition-all hover:shadow-lg hover:shadow-indigo-500/20">
+                  <div className="text-center mb-3">
+                    <div className="text-3xl mb-2">👑</div>
+                    <p className="text-white text-2xl font-bold">R$ 15.000</p>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Risco/Op</p>
+                      <p className="text-red-400 font-bold">R$ 300,00</p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Gain Alvo</p>
+                      <p className="text-yellow-400 font-bold">R$ 600,00</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-indigo-600/30 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-green-400">✓ Ganhos (16)</span>
+                      <span className="text-green-300 font-bold">R$ 9.600</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-red-400">✗ Perdas (4)</span>
+                      <span className="text-red-300 font-bold">R$ 1.200</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-indigo-600/30">
+                      <span className="text-indigo-300 font-semibold">Lucro Total</span>
+                      <span className="text-indigo-200 font-bold text-base">R$ 8.400</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 7 */}
+                <div className="bg-gradient-to-br from-cyan-900/40 to-teal-900/40 rounded-xl p-4 border-2 border-cyan-600/50 hover:border-cyan-500 transition-all hover:shadow-lg hover:shadow-cyan-500/20">
+                  <div className="text-center mb-3">
+                    <div className="text-3xl mb-2">💎</div>
+                    <p className="text-white text-2xl font-bold">R$ 30.000</p>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Risco/Op</p>
+                      <p className="text-red-400 font-bold">R$ 500,00</p>
+                    </div>
+                    <div className="bg-slate-900/50 rounded p-2">
+                      <p className="text-slate-400">Gain Alvo</p>
+                      <p className="text-yellow-400 font-bold">R$ 1.000</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-cyan-600/30 space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-green-400">✓ Ganhos (16)</span>
+                      <span className="text-green-300 font-bold">R$ 16.000</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-red-400">✗ Perdas (4)</span>
+                      <span className="text-red-300 font-bold">R$ 2.000</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-cyan-600/30">
+                      <span className="text-cyan-300 font-semibold">Lucro Total</span>
+                      <span className="text-cyan-200 font-bold text-base">R$ 14.000</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Estatísticas Resumidas */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
               <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700">
